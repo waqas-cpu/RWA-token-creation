@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RWA Platform Dashboard</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 24px; background: #f6f8fb; color: #1f2937; }
+      h1, h2 { margin: 0 0 12px 0; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .card { background: #fff; border: 1px solid #dbe4ee; border-radius: 10px; padding: 16px; }
+      label { display: block; margin-top: 8px; font-size: 12px; color: #4b5563; }
+      input { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #cbd5e1; border-radius: 6px; }
+      button { margin-top: 10px; padding: 8px 12px; border: none; background: #2563eb; color: #fff; border-radius: 6px; cursor: pointer; }
+      pre { background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 12px; overflow: auto; max-height: 240px; }
+    </style>
+  </head>
+  <body>
+    <h1>RWA Tokenization Dashboard</h1>
+    <p>Backend URL: <code id="apiUrlLabel"></code></p>
+    <p>
+      Account abstraction template:
+      <a href="/account-abstraction-template.html" target="_blank" rel="noopener noreferrer">
+        Open ERC-4337 template
+      </a>
+    </p>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Investor Onboarding</h2>
+        <label>Wallet</label><input id="wallet" placeholder="0x..." />
+        <label>Country Code</label><input id="countryCode" value="840" />
+        <label>Category</label><input id="category" value="1" />
+        <label>KYC Score</label><input id="kycScore" value="100" />
+        <label>AML Flagged (true/false)</label><input id="amlFlagged" value="false" />
+        <button onclick="onboard()">Run Onboarding</button>
+      </section>
+
+      <section class="card">
+        <h2>Compliance Transfer Check</h2>
+        <label>From</label><input id="from" placeholder="0x..." />
+        <label>To</label><input id="to" placeholder="0x..." />
+        <label>Amount</label><input id="amount" value="1000000000000000000" />
+        <button onclick="checkTransfer()">Check Transfer</button>
+      </section>
+
+      <section class="card">
+        <h2>Oracle Price Update</h2>
+        <label>Symbol</label><input id="symbol" value="RWA/USD" />
+        <label>Value</label><input id="price" value="101.25" />
+        <button onclick="pushPrice()">Publish Price</button>
+        <button onclick="loadPrices()">Load Prices</button>
+      </section>
+
+      <section class="card">
+        <h2>Indexer Feed</h2>
+        <button onclick="loadEvents()">Load Latest Events</button>
+      </section>
+    </div>
+
+    <h2>Response</h2>
+    <pre id="out">{}</pre>
+
+    <script>
+      const apiUrl = localStorage.getItem("backendUrl") || "http://localhost:4000";
+      document.getElementById("apiUrlLabel").textContent = apiUrl;
+
+      function show(data) {
+        document.getElementById("out").textContent = JSON.stringify(data, null, 2);
+      }
+
+      async function post(path, body) {
+        const res = await fetch(`${apiUrl}${path}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        return res.json();
+      }
+
+      async function get(path) {
+        const res = await fetch(`${apiUrl}${path}`);
+        return res.json();
+      }
+
+      async function onboard() {
+        const payload = {
+          wallet: document.getElementById("wallet").value.trim(),
+          countryCode: Number(document.getElementById("countryCode").value),
+          category: Number(document.getElementById("category").value),
+          kycScore: Number(document.getElementById("kycScore").value),
+          amlFlagged: document.getElementById("amlFlagged").value === "true"
+        };
+        show(await post("/api/onboarding/investor", payload));
+      }
+
+      async function checkTransfer() {
+        const payload = {
+          from: document.getElementById("from").value.trim(),
+          to: document.getElementById("to").value.trim(),
+          amount: document.getElementById("amount").value.trim()
+        };
+        show(await post("/api/compliance/check-transfer", payload));
+      }
+
+      async function pushPrice() {
+        const payload = {
+          symbol: document.getElementById("symbol").value.trim(),
+          value: Number(document.getElementById("price").value)
+        };
+        show(await post("/api/oracle/price", payload));
+      }
+
+      async function loadPrices() {
+        show(await get("/api/oracle/prices"));
+      }
+
+      async function loadEvents() {
+        show(await get("/api/indexer/events"));
+      }
+    </script>
+  </body>
+</html>

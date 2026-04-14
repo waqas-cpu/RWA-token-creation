@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RWA AA Template (ERC-4337)</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 24px; background: #f6f8fb; color: #1f2937; }
+      .card { background: #fff; border: 1px solid #dbe4ee; border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+      label { display: block; margin-top: 8px; font-size: 12px; color: #4b5563; }
+      input, textarea { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: monospace; }
+      button { margin-top: 10px; padding: 8px 12px; border: none; background: #2563eb; color: #fff; border-radius: 6px; cursor: pointer; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      pre { background: #0f172a; color: #e2e8f0; border-radius: 8px; padding: 12px; overflow: auto; max-height: 280px; }
+      .hint { color: #374151; font-size: 13px; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.15.0/dist/ethers.umd.min.js"></script>
+  </head>
+  <body>
+    <h1>Account Abstraction Template (ERC-4337)</h1>
+    <p class="hint">Use this template page as a starting point for bundler/paymaster integration in your web app.</p>
+
+    <section class="card">
+      <h2>Config</h2>
+      <div class="row">
+        <div>
+          <label>Bundler RPC URL</label>
+          <input id="bundlerRpc" placeholder="https://your-bundler-rpc" />
+        </div>
+        <div>
+          <label>EntryPoint (v0.6 default)</label>
+          <input id="entryPoint" value="0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Smart Account Address (sender)</label>
+          <input id="smartAccount" placeholder="0x..." />
+        </div>
+        <div>
+          <label>Nonce (manual template)</label>
+          <input id="nonce" value="0x0" />
+        </div>
+      </div>
+      <button onclick="connectWallet()">Connect EOA</button>
+      <div class="hint" id="walletStatus">Wallet: not connected</div>
+    </section>
+
+    <section class="card">
+      <h2>Call Template (ERC3643 mint)</h2>
+      <div class="row">
+        <div>
+          <label>Target Contract (ERC3643Token)</label>
+          <input id="target" placeholder="0x..." />
+        </div>
+        <div>
+          <label>Value (wei)</label>
+          <input id="value" value="0x0" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Mint To</label>
+          <input id="mintTo" placeholder="0x..." />
+        </div>
+        <div>
+          <label>Mint Amount</label>
+          <input id="mintAmount" value="1" />
+        </div>
+      </div>
+      <button onclick="buildMintCallData()">Build callData</button>
+      <label>callData (for smart account execute)</label>
+      <textarea id="callData" rows="4" placeholder="0x..."></textarea>
+    </section>
+
+    <section class="card">
+      <h2>UserOperation</h2>
+      <button onclick="buildUserOperation()">Build UserOp</button>
+      <button onclick="estimateUserOperationGas()">Estimate Gas</button>
+      <button onclick="sendUserOperation()">Send UserOp</button>
+      <div class="hint">
+        Signing is a template hook. Plug in your AA SDK signer (Alchemy/Biconomy/ZeroDev) in
+        <code>signUserOperation()</code>.
+      </div>
+    </section>
+
+    <h2>Output</h2>
+    <pre id="out">{}</pre>
+
+    <script>
+      let connectedEoa = null;
+      let currentUserOp = null;
+
+      function show(data) {
+        document.getElementById("out").textContent = JSON.stringify(data, null, 2);
+      }
+
+      async function connectWallet() {
+        if (!window.ethereum) {
+          show({ error: "No injected wallet found (MetaMask/other)." });
+          return;
+        }
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        connectedEoa = accounts[0] || null;
+        document.getElementById("walletStatus").textContent = `Wallet: ${connectedEoa || "not connected"}`;
+        show({ connectedEoa });
+      }
+
+      function buildMintCallData() {
+        const tokenAbi = ["function mint(address to, uint256 amount)"];
+        const iface = new ethers.Interface(tokenAbi);
+        const to = document.getElementById("mintTo").value.trim();
+        const amount = document.getElementById("mintAmount").value.trim();
+        const callData = iface.encodeFunctionData("mint", [to, amount]);
+        document.getElementById("callData").value = callData;
+        show({ callData });
+      }
+
+      function buildUserOperation() {
+        const sender = document.getElementById("smartAccount").value.trim();
+        const target = document.getElementById("target").value.trim();
+        const callData = document.getElementById("callData").value.trim();
+        const nonce = document.getElementById("nonce").value.trim();
+        const value = document.getElementById("value").value.trim();
+
+        // Template encoding for single call execution; replace with your account's execute ABI if needed.
+        const accountExecuteAbi = ["function execute(address target,uint256 value,bytes data)"];
+        const executeIface = new ethers.Interface(accountExecuteAbi);
+        const accountCallData = executeIface.encodeFunctionData("execute", [target, value, callData]);
+
+        currentUserOp = {
+          sender,
+          nonce,
+          initCode: "0x",
+          callData: accountCallData,
+          callGasLimit: "0x0",
+          verificationGasLimit: "0x0",
+          preVerificationGas: "0x0",
+          maxFeePerGas: "0x0",
+          maxPriorityFeePerGas: "0x0",
+          paymasterAndData: "0x",
+          signature: "0x"
+        };
+
+        show({ userOperation: currentUserOp });
+      }
+
+      async function rpcCall(url, method, params) {
+        const payload = {
+          jsonrpc: "2.0",
+          id: Date.now(),
+          method,
+          params
+        };
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        return res.json();
+      }
+
+      async function estimateUserOperationGas() {
+        if (!currentUserOp) {
+          show({ error: "Build UserOp first." });
+          return;
+        }
+
+        const bundlerRpc = document.getElementById("bundlerRpc").value.trim();
+        const entryPoint = document.getElementById("entryPoint").value.trim();
+        const result = await rpcCall(bundlerRpc, "eth_estimateUserOperationGas", [currentUserOp, entryPoint]);
+
+        if (result.error) {
+          show(result);
+          return;
+        }
+
+        currentUserOp.callGasLimit = result.result.callGasLimit;
+        currentUserOp.verificationGasLimit = result.result.verificationGasLimit;
+        currentUserOp.preVerificationGas = result.result.preVerificationGas;
+        show({ estimated: result.result, userOperation: currentUserOp });
+      }
+
+      async function signUserOperation(userOperation) {
+        // Template hook:
+        // Replace with SDK signer for your selected AA provider.
+        // Example: Alchemy Account Kit, Biconomy, ZeroDev, Stackup, Pimlico, etc.
+        return {
+          ...userOperation,
+          signature: "0xYOUR_AA_SIGNATURE"
+        };
+      }
+
+      async function sendUserOperation() {
+        if (!currentUserOp) {
+          show({ error: "Build UserOp first." });
+          return;
+        }
+
+        const bundlerRpc = document.getElementById("bundlerRpc").value.trim();
+        const entryPoint = document.getElementById("entryPoint").value.trim();
+        const signedUserOp = await signUserOperation(currentUserOp);
+
+        const sendResult = await rpcCall(bundlerRpc, "eth_sendUserOperation", [signedUserOp, entryPoint]);
+        show({ sendResult, signedUserOp });
+      }
+    </script>
+  </body>
+</html>

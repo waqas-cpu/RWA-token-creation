@@ -1,0 +1,38 @@
+{
+  "name": "rwa-tokenization-ecosystem",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy.js",
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "verify:deployment:local": "hardhat run scripts/verify-deployment.js",
+    "verify:deployment:sepolia": "hardhat run scripts/verify-deployment.js --network sepolia",
+    "backend:start": "node services/backend/src/server.js",
+    "indexer:start": "node services/indexer/src/indexer.js",
+    "dashboard:start": "node services/backend/src/static-server.js",
+    "dashboard:react:dev": "vite --config apps/dashboard-react/vite.config.js",
+    "dashboard:react:build": "vite build --config apps/dashboard-react/vite.config.js",
+    "dashboard:react:preview": "vite preview --config apps/dashboard-react/vite.config.js"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.0",
+    "@nomicfoundation/hardhat-toolbox": "^6.0.0",
+    "dotenv": "^16.6.1",
+    "hardhat": "^2.28.0",
+    "stacktrace-parser": "^0.1.11",
+    "vite": "^7.1.10"
+  },
+  "dependencies": {
+    "@biconomy/account": "^4.6.3",
+    "@tanstack/react-query": "^5.90.3",
+    "cors": "^2.8.5",
+    "ethers": "^6.15.0",
+    "express": "^5.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "viem": "^2.38.3",
+    "wagmi": "^2.18.1"
+  }
+}

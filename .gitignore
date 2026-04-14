@@ -1,0 +1,9 @@
+node_modules/
+artifacts/
+cache/
+dist/
+apps/dashboard-react/dist/
+services/indexer/data/
+services/backend/data/
+.env
+*.log
